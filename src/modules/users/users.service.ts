@@ -1,28 +1,31 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { IUser } from './user.interface';
+import { CreateUserDto } from './types-dto/create-user.dto';
+import { Repository } from 'typeorm';
+import { User } from './entities/user.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { plainToInstance } from 'class-transformer';
 
 @Injectable()
 export class UsersService {
-  private users: IUser[] = [
-    {
-      id: '1',
-      username: 'test',
-    },
-    {
-      id: '2',
-      username: 'test2',
-    },
-  ];
+  constructor(
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+  ) {}
 
-  findAll() {
-    return this.users;
+  async findAll(): Promise<User[]> {
+    const users = await this.userRepository.find();
+    return plainToInstance(User, users);
   }
 
-  findOne(id: string): IUser {
-    const user = this.users.find((user) => user.id === id);
-    if (!user) {
-      throw new NotFoundException('ya pas');
-    }
-    return user;
+  async findOne(id: string): Promise<User> {
+    const user = await this.userRepository.findOneBy({ id });
+    return plainToInstance(User, user);
+  }
+
+  async create(createUserDto: CreateUserDto): Promise<User> {
+    const newUser = this.userRepository.create({ ...createUserDto });
+    const savedUser = await this.userRepository.save(newUser);
+    return plainToInstance(User, savedUser); //pour exclure le mdp de l'exposition
   }
 }
