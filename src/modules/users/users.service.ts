@@ -1,10 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { IUser } from './user.interface';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './types-dto/create-user.dto';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -24,7 +24,21 @@ export class UsersService {
   }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const newUser = this.userRepository.create({ ...createUserDto });
+    //vérification que l'email n'existe pas déjà en bdd
+    const existingUser = await this.userRepository.findOneBy({
+      email: createUserDto.email,
+    });
+    if (existingUser) {
+      throw new ConflictException('Cet email est déjà utilisé.');
+    }
+    //hash du mot de passe
+    const saltRounds = 10; //*bon équilibre sécurité/performances
+    const hashPassword = await bcrypt.hash(createUserDto.password, saltRounds);
+    //insert et return de l'instance User
+    const newUser = this.userRepository.create({
+      ...createUserDto,
+      password: hashPassword,
+    });
     const savedUser = await this.userRepository.save(newUser);
     return plainToInstance(User, savedUser); //pour exclure le mdp de l'exposition
   }
